@@ -1,0 +1,79 @@
+# tiny-headers-redact
+
+> Framework-agnostic middleware that redacts credentials from HTTP headers.
+
+## What it does
+
+Rewrites credential-shaped HTTP headers (Authorization, Cookie, X-API-Key,
+Stripe-Signature, etc.) to `[REDACTED:<rule_name>]` placeholders before
+the wrapped app, log line, or trace span sees them. Backed by
+`tiny-secret-mask>=0.5.0`.
+
+## When to use it
+
+- You log, forward, persist, or trace HTTP requests and need a credential-
+  safe view.
+- You do not use tiny-router and want a framework-agnostic middleware.
+- You want a single function call (`redact_headers(headers)`) to do the
+  work, with no boilerplate.
+
+## When NOT to use it
+
+- You use tiny-router and want the tightest integration: use the
+  `tiny_router_redact_headers` sidecar instead.
+- You need body-level redaction: use `tiny-secret-mask.mask_string` and
+  `tiny-secret-mask.mask_dict` directly.
+
+## Public surface
+
+```python
+from tiny_headers_redact import (
+    redact_headers,                       # (headers: dict) -> dict
+    header_redactor_middleware,           # (get_response, *, stats, on_redact) -> callable
+    header_redactor_asgi_middleware,      # (app, *, stats) -> async callable
+    HeaderStats,                          # (headers_seen, redactions, last_redacted_header, as_dict)
+)
+```
+
+## Quick recipes
+
+**Just rewrite a dict:**
+
+```python
+safe_headers = redact_headers(request.headers)
+```
+
+**WSGI middleware:**
+
+```python
+app = header_redactor_middleware(my_app, stats=stats)
+```
+
+**FastAPI adapter (no built-in; use Starlette):**
+
+```python
+from starlette.middleware.base import BaseHTTPMiddleware
+class HeaderRedactorMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request, call_next):
+        if request.headers:
+            new_headers = redact_headers(dict(request.headers))
+            request.headers = new_headers
+        return await call_next(request)
+```
+
+## Layered defence
+
+Use `tiny-headers-redact` at the HTTP boundary AND `tiny-secret-mask`
+deeper in the stack. A credential that slips past header redaction (say,
+a value embedded in a JSON body) is still caught by `mask_dict` /
+`mask_string` at the log line.
+
+## Related
+
+- `tiny-secret-mask` - the engine that does the work.
+- `tiny-router` v0.7.4 - has a sidecar `tiny_router_redact_headers`.
+- `tiny-route-redact` - the path-redaction equivalent.
+- `tiny-log` v0.5.x - has its own redaction bridge.
+- `fast-cache` v0.7.x - CRDT-aware cache for shared state across
+  redaction-aware services.
+
