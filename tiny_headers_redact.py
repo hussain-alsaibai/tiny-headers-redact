@@ -107,8 +107,28 @@ def redact_headers(headers):
     if headers is None:
         return {}
     if _MASK is None:
-        return dict(headers)
+        # A security library that quietly stops redacting is worse than one
+        # that is not installed at all: the caller believes headers are
+        # scrubbed while credentials flow through untouched. Fail loudly
+        # instead. Use redact_headers_passthrough() for a deliberate no-op.
+        raise RuntimeError(
+            "tiny_secret_mask >= 0.5.0 is required for header redaction, "
+            "but it could not be imported. Install it, or call "
+            "redact_headers_passthrough() to opt out explicitly."
+        )
     return _MASK(dict(headers))
+
+
+def redact_headers_passthrough(headers):
+    """Return a shallow copy of headers with NO redaction applied.
+
+    This is the explicit opt-out for callers that cannot install
+    tiny_secret_mask. Prefer redact_headers(), which raises rather than
+    silently passing credentials through.
+    """
+    if headers is None:
+        return {}
+    return dict(headers)
 
 
 # ---------- Middleware ----------

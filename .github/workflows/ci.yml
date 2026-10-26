@@ -15,6 +15,10 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
       - name: Install pytest
-        run: pip install pytest
+        # tiny-secret-mask is a hard dependency of this package. It is not
+        # on PyPI yet, so install it from GitHub.
+        run: |
+          pip install pytest
+          pip install "tiny-secret-mask @ git+https://github.com/hussain-alsaibai/tiny-secret-mask.git"
       - name: Run test suite
         run: python -m pytest tests -v
